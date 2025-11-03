@@ -2,7 +2,7 @@ import React, { useState, FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
-import { Icon } from '../components/ui';
+import { Icon, Logo } from '../components/ui';
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -50,7 +50,7 @@ const LoginPage: React.FC = () => {
                 <nav className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-center sm:justify-start h-16">
                         <a href="/#" className="flex items-center space-x-3">
-                            <img src="https://placehold.co/48x48/8B4513/FFFFFF?text=LCE&font=inter" alt="LCE Logo" className="h-9 w-9 rounded-full" />
+                            <Logo className="h-9 w-9" />
                             <span className="text-xl font-bold text-stone-800">Legal Chicks Empowerment Network</span>
                         </a>
                     </div>

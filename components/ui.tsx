@@ -14,6 +14,30 @@ export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
   return <LucideIcon {...props} />;
 };
 
+export const Logo = ({ className }: { className?: string }) => (
+    <svg
+        className={className}
+        viewBox="0 0 64 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-label="Legal Chicks Empowerment Network Logo"
+    >
+        <circle cx="32" cy="32" r="32" fill="var(--color-primary)" />
+        <text
+            x="50%"
+            y="50%"
+            dominantBaseline="central"
+            textAnchor="middle"
+            fontFamily="Inter, sans-serif"
+            fontSize="26"
+            fontWeight="bold"
+            fill="white"
+        >
+            LCE
+        </text>
+    </svg>
+);
+
 
 export const Loader: React.FC = () => (
   <div className="flex justify-center items-center p-4">
@@ -24,7 +48,7 @@ export const Loader: React.FC = () => (
 export const FullScreenLoader: React.FC = () => (
     <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex justify-center items-center z-50">
         <div className="flex flex-col items-center gap-4">
-            <img src="https://placehold.co/64x64/8B4513/FFFFFF?text=LCE&font=inter" alt="LCE Logo" className="h-16 w-16 rounded-full animate-pulse" />
+            <Logo className="h-16 w-16 animate-pulse" />
             <p className="text-stone-700 font-semibold">Loading Network...</p>
         </div>
     </div>

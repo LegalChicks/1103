@@ -1,7 +1,6 @@
-
 import React, { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon, Modal } from '../components/ui';
+import { Icon, Modal, Logo } from '../components/ui';
 import { db, appId } from '../services/firebase';
 import { addDoc, collection } from 'firebase/firestore';
 
@@ -44,7 +43,7 @@ const Header: React.FC<{ isMobileMenuOpen: boolean, setMobileMenuOpen: (isOpen: 
             <nav className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
                 <div className="flex items-center justify-between">
                     <a href="#home" className="flex items-center space-x-3">
-                        <img src="https://placehold.co/48x48/8B4513/FFFFFF?text=LCE&font=inter" alt="LCE Logo" className="h-10 w-10 rounded-full" />
+                        <Logo className="h-10 w-10" />
                         <span className={`text-xl font-bold hidden sm:block ${isScrolled ? 'text-stone-800' : 'text-white'}`}>Legal Chicks</span>
                     </a>
                     <div className="hidden lg:flex items-center space-x-6">
