@@ -33,6 +33,10 @@ const renderMarkdown = (text: string) => {
     let html = text.replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold text-text-primary my-2">$1</h3>');
 
     html = html.replace(/(\r\n|\n|\r)/gm, '\n'); 
+    
+    // Bold text
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
     const listRegex = /((?:\* .*(?:\n|$))+)/g;
     html = html.replace(listRegex, (match) => {
         const items = match.trim().split('\n').map(item => 
@@ -44,7 +48,7 @@ const renderMarkdown = (text: string) => {
     return <div className="prose prose-sm max-w-none text-text-secondary" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-const AICoPilotCard: React.FC<{ kpis: KPI }> = ({ kpis }) => {
+const AICoPilotCard: React.FC<{ kpis: KPI, history: ProductionRecord[] }> = ({ kpis, history }) => {
     const [report, setReport] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -54,7 +58,7 @@ const AICoPilotCard: React.FC<{ kpis: KPI }> = ({ kpis }) => {
         setError('');
         setReport('');
         try {
-            const result = await generateInsightReport(kpis);
+            const result = await generateInsightReport(kpis, history);
             setReport(result);
         } catch (err) {
             setError('Failed to generate report. Please try again.');
@@ -66,13 +70,15 @@ const AICoPilotCard: React.FC<{ kpis: KPI }> = ({ kpis }) => {
     return (
         <div className="bg-[--color-card] p-6 rounded-lg shadow-sm border border-[--color-border]">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-text-primary">AI Co-Pilot</h3>
+                <h3 className="text-lg font-semibold text-text-primary">AI Co-Pilot: Advanced Analytics</h3>
                 <Icon name="Sparkles" className="text-[--color-accent]" />
             </div>
             {isLoading ? <Loader /> : report ? renderMarkdown(report) : (
                 <div className="text-center py-4">
-                    <p className="text-[--color-text-secondary] mb-4">Get an AI-powered analysis of your farm's health and an actionable plan.</p>
-                    <button onClick={handleGenerateReport} className="btn btn-dark py-2 px-4">Generate Insight Report</button>
+                    <p className="text-[--color-text-secondary] mb-4">
+                        Generate a detailed forecast including <strong>Feed Cost projections</strong> and <strong>Production trends</strong> based on your recent data.
+                    </p>
+                    <button onClick={handleGenerateReport} className="btn btn-dark py-2 px-4">Generate Forecast & Insights</button>
                 </div>
             )}
             {error && <p className="text-sm text-[--color-danger] mt-2">{error}</p>}
@@ -91,6 +97,26 @@ const AnnouncementsCard: React.FC<{ announcements: Announcement[] }> = ({ announ
                 </li>
             )) : <p className="text-[--color-text-secondary]">No new announcements.</p>}
         </ul>
+    </div>
+);
+
+const LivestockSummaryCard: React.FC<{ livestock: LivestockFlock[] }> = ({ livestock }) => (
+    <div className="bg-[--color-card] p-6 rounded-lg shadow-sm border border-[--color-border]">
+        <h3 className="text-lg font-semibold text-text-primary mb-4">Flock Overview</h3>
+        <div className="space-y-3">
+            {livestock.length > 0 ? livestock.map(flock => (
+                <div key={flock.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div>
+                        <p className="font-semibold text-text-primary">{flock.type}</p>
+                        <p className="text-sm text-[--color-text-secondary]">{flock.status} - {flock.age} weeks old</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="font-bold text-lg text-text-primary">{flock.headcount.toLocaleString()}</p>
+                        <p className="text-xs text-[--color-text-secondary]">birds</p>
+                    </div>
+                </div>
+            )) : <p className="text-center text-[--color-text-secondary] py-4">No livestock data available.</p>}
+        </div>
     </div>
 );
 
@@ -133,11 +159,15 @@ const DashboardHomeView: React.FC<DashboardHomeViewProps> = ({kpis, announcement
             
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                    {kpis && <AICoPilotCard kpis={kpis} />}
+                    {kpis && <AICoPilotCard kpis={kpis} history={eggProductionHistory} />}
                 </div>
                 <div>
                     <AnnouncementsCard announcements={announcements} />
                 </div>
+            </section>
+            
+            <section>
+                <LivestockSummaryCard livestock={livestock} />
             </section>
             
             <section id="charts" className="grid grid-cols-1 lg:grid-cols-2 gap-6">

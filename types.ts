@@ -19,7 +19,11 @@ export interface KPI {
 }
 
 export interface Profile {
+  uid: string;
   name: string;
+  email: string;
+  role: 'admin' | 'power-admin' | 'member' | 'editor' | 'viewer';
+  photoURL?: string;
 }
 
 export interface LivestockFlock {
@@ -79,4 +83,15 @@ export interface UserSettings {
     notifyMarket?: boolean;
     notifyNews?: boolean;
     notifyPrice?: boolean;
+}
+
+export interface MembershipApplication {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    farmLocation: string;
+    farmSize: string;
+    status: 'pending' | 'approved' | 'rejected';
+    submittedAt: string;
 }

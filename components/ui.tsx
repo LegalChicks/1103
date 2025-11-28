@@ -1,14 +1,18 @@
 import React from 'react';
 import { icons, LucideProps } from 'lucide-react';
 
-interface IconProps extends LucideProps {
+// FIX: Changed from interface to type alias to potentially help TypeScript
+// correctly resolve the inherited properties from LucideProps, like 'className'.
+type IconProps = {
   name: keyof typeof icons;
-}
+} & LucideProps;
+
 
 export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
   const LucideIcon = icons[name];
   if (!LucideIcon) {
-    console.warn(`Icon with name "${name}" not found.`);
+    // FIX: Wrapping `name` in String() to prevent a runtime error when the icon name is a symbol.
+    console.warn(`Icon with name "${String(name)}" not found.`);
     return null;
   }
   return <LucideIcon {...props} />;

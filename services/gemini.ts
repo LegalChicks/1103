@@ -16,7 +16,12 @@ function formatPercentage(value: number, decimals = 0) {
     }).format(value);
 }
 
-export const generateInsightReport = async (kpiData: KPI): Promise<string> => {
+interface ProductionRecord {
+    id: string; // YYYY-MM-DD
+    eggs: number;
+}
+
+export const generateInsightReport = async (kpiData: KPI, productionHistory: ProductionRecord[] = []): Promise<string> => {
   if (!process.env.API_KEY) {
     console.error("API_KEY environment variable not set.");
     return "Error: API Key is not configured. Please contact support.";
@@ -24,19 +29,49 @@ export const generateInsightReport = async (kpiData: KPI): Promise<string> => {
   
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+  // Format history for the prompt
+  const historyString = productionHistory
+    .slice(0, 7) // Last 7 days
+    .map(d => `- ${d.id}: ${d.eggs} eggs`)
+    .join('\n');
+
   const userPrompt = `
-      Analyze the following current farm health metrics for a layer operation in the Legal Chicks Empowerment Network (LCEN):
-      - Feed Conversion Ratio (FCR): ${kpiData.fcr ? kpiData.fcr.toFixed(2) : 'N/A'}
+      Analyze the following farm metrics for a layer operation (Rhode Island Reds) in the Legal Chicks Empowerment Network (LCEN).
+
+      ### CURRENT SNAPSHOT:
+      - Feed Conversion Ratio (FCR): ${kpiData.fcr ? kpiData.fcr.toFixed(2) : 'N/A'} (Target: < 2.2)
       - Egg Production Rate (Hen-Day %): ${kpiData.eggProductionRate ? formatPercentage(kpiData.eggProductionRate, 1) : 'N/A'}
       - Feed Cost per Egg: ${kpiData.feedCostPerEgg ? formatCurrency(kpiData.feedCostPerEgg) : 'N/A'}
       - 7-Day Mortality Rate: ${kpiData.mortalityRate ? formatPercentage(kpiData.mortalityRate, 1) : 'N/A'}
 
-      Provide a two-part response:
-      1. Diagnosis (H3): A concise, single-paragraph analysis of the farm's overall health and the most critical area needing attention.
-      2. Action Plan (H3): A maximum of three bullet points providing specific, actionable steps to address the critical area, aligning with LCE's focus on biosecurity and feed efficiency. Use simple, direct language suitable for a farmer.
+      ### HISTORICAL PRODUCTION (Last 7 Days):
+      ${historyString || "No historical data available."}
+
+      ### REQUESTED ANALYSIS:
+      Provide a comprehensive 4-part report using Markdown (H3 headers):
+
+      1. **Diagnosis**: A concise assessment of farm health. Is the flock performing above or below industry standards?
+      
+      2. **Feed Cost Forecast**: 
+         - Analyze the current FCR of ${kpiData.fcr.toFixed(2)}. 
+         - If FCR is high (>2.2), calculate the estimated financial loss per 100 birds per week compared to a standard FCR of 2.0. 
+         - If FCR is good, project the monthly savings.
+         - *Show rough math to justify the insight.*
+
+      3. **Production Trend Prediction**: 
+         - Based on the last 7 days of egg counts, is production trending up, down, or plateauing? 
+         - Predict the likely production average for the *next* 3 days if current conditions persist.
+
+      4. **Action Plan**: 
+         - 3 specific, bulleted steps to optimize the metrics above. Focus on biosecurity and feed efficiency.
   `;
 
-  const systemPrompt = `You are the Legal Chicks Empowerment Network (LCEN) AI Co-Pilot. Your goal is to provide expert, actionable, and empathetic advice to small poultry farmers in the Cagayan Valley, Philippines. Base your recommendations on poultry industry best practices, prioritizing biosecurity, cost efficiency, and revenue generation from egg layers (Rhode Island Reds - RIR). Format your response strictly using Markdown with H3 headings for Diagnosis and Action Plan. Use PHP currency (₱) where appropriate.`;
+  const systemPrompt = `You are the Legal Chicks Empowerment Network (LCEN) AI Co-Pilot. Your goal is to act as a senior poultry agronomist and financial analyst for smallholders in Cagayan Valley. 
+  
+  - Tone: Professional, encouraging, but data-driven and realistic.
+  - Context: High FCR means wasted feed (money). High mortality is a biosecurity red flag.
+  - formatting: Use Markdown. Use Bold for emphasis on numbers. Use PHP (₱) for currency.
+  `;
 
   try {
     const response = await ai.models.generateContent({
