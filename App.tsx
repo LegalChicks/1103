@@ -1,9 +1,6 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { onAuthStateChanged, User, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { auth, db, appId } from './services/firebase';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { supabase, authService, dbService } from './services/supabase';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -11,11 +8,10 @@ import AdminPage from './pages/AdminPage';
 import { FullScreenLoader } from './components/ui';
 import { Profile } from './types';
 
-// LIST OF EMAILS THAT AUTOMATICALLY BECOME SUPER ADMINS
 const SUPER_ADMINS = ['admin@legalchicks.vip'];
 
 interface AuthContextType {
-  user: User | null;
+  user: any | null;
   profile: Profile | null;
   loading: boolean;
 }
@@ -25,174 +21,63 @@ const AuthContext = createContext<AuthContextType>({ user: null, profile: null, 
 export const useAuth = () => useContext(AuthContext);
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const handleMagicLinkSignIn = async () => {
-        if (isSignInWithEmailLink(auth, window.location.href)) {
-            let email = window.localStorage.getItem('emailForSignIn');
-            if (email) {
-                try {
-                    await signInWithEmailLink(auth, email, window.location.href);
-                    window.localStorage.removeItem('emailForSignIn');
-                    // onAuthStateChanged will handle the user state update.
-                    // Clear the URL to prevent re-triggering
-                    window.history.replaceState(null, '', window.location.pathname + window.location.hash);
-                } catch (error) {
-                    console.error("Magic link sign-in error", error);
-                    // Let the app continue to load, user will not be signed in.
-                }
-            }
-        }
-    };
-    
-    handleMagicLinkSignIn();
+    // Listen to auth state changes
+    const { data: { subscription } } = authService.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ??  null);
 
-    let profileUnsubscribe: (() => void) | null = null;
-
-    const authUnsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      
-      // Clean up previous profile listener if it exists
-      if (profileUnsubscribe) {
-          profileUnsubscribe();
-          profileUnsubscribe = null;
-      }
-
-      if (firebaseUser) {
-        const profileRef = doc(db, `artifacts/${appId}/users/${firebaseUser.uid}/profile/details`);
+      if (session?.user) {
+        // Fetch or create user profile
+        const { data, error } = await dbService.getUser(session.user.id);
         
-        // Subscribe to real-time updates for the profile
-        profileUnsubscribe = onSnapshot(profileRef, async (docSnap) => {
-            let userProfile: Profile;
-
-            if (docSnap.exists()) {
-                userProfile = docSnap.data() as Profile;
-            } else {
-                // If profile doc doesn't exist yet, set a temporary default
-                userProfile = { 
-                    uid: firebaseUser.uid, 
-                    email: firebaseUser.email || '', 
-                    name: firebaseUser.email || 'New Member', 
-                    role: 'member' 
-                };
-            }
-
-            // --- SUPER ADMIN BOOTSTRAP LOGIC ---
-            // If the logged-in email is in the SUPER_ADMINS list, force update their role to 'power-admin'
-            // This ensures you have access immediately.
-            if (firebaseUser.email && SUPER_ADMINS.includes(firebaseUser.email) && userProfile.role !== 'power-admin') {
-                console.log("Auto-promoting user to Power Admin...");
-                const updatedProfile = { ...userProfile, role: 'power-admin' as const };
-                // Update local state immediately for responsiveness
-                userProfile = updatedProfile; 
-                // Persist to database
-                await setDoc(profileRef, updatedProfile, { merge: true });
-            }
-            // -----------------------------------
-
-            setProfile(userProfile);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching profile:", error);
-            setLoading(false);
-        });
+        if (error || !data) {
+          // Create new profile if it doesn't exist
+          await dbService.createUserProfile(session.user.id, {
+            uid: session.user.id,
+            email: session.user.email,
+            name: session.user.email || 'New Member',
+            role:  SUPER_ADMINS.includes(session.user.email || '') ? 'power-admin' : 'member',
+          });
+          
+          const newProfile = await dbService.getUser(session.user.id);
+          setProfile(newProfile. data as Profile);
+        } else {
+          // Check if user should be promoted to power-admin
+          if (session.user.email && SUPER_ADMINS. includes(session.user.email) && data.role !== 'power-admin') {
+            await dbService.updateUserProfile(session.user.id, { role: 'power-admin' });
+            setProfile({ ...data, role: 'power-admin' } as Profile);
+          } else {
+            setProfile(data as Profile);
+          }
+        }
       } else {
         setProfile(null);
-        setLoading(false);
       }
+
+      setLoading(false);
     });
 
-    return () => {
-        authUnsubscribe();
-        if (profileUnsubscribe) profileUnsubscribe();
-    };
+    return () => subscription?.unsubscribe();
   }, []);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading }}>
-      {children}
+      {loading ? <FullScreenLoader /> :  (
+        <HashRouter>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
+            <Route path="/dashboard" element={user ? <DashboardPage /> :  <Navigate to="/login" />} />
+            <Route path="/admin" element={user && profile?. role === 'power-admin' ? <AdminPage /> : <Navigate to="/dashboard" />} />
+          </Routes>
+        </HashRouter>
+      )}
     </AuthContext.Provider>
   );
 };
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user, loading } = useAuth();
-    const location = useLocation();
-
-    if (loading) {
-        return <FullScreenLoader />;
-    }
-
-    if (!user) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
-    }
-
-    return <>{children}</>;
-};
-
-const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user, profile, loading } = useAuth();
-    const location = useLocation();
-
-    if (loading) {
-        return <FullScreenLoader />;
-    }
-
-    if (!user) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
-    }
-    
-    if (profile?.role !== 'admin' && profile?.role !== 'power-admin') {
-        return <Navigate to="/dashboard" replace />;
-    }
-
-    return <>{children}</>;
-};
-
-
-const App: React.FC = () => {
-  return (
-    <AuthProvider>
-      <Router />
-    </AuthProvider>
-  );
-};
-
-const Router = () => {
-    const { loading } = useAuth();
-    
-    if (loading) {
-        return <FullScreenLoader />;
-    }
-
-    return (
-        <HashRouter>
-            <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route 
-                    path="/dashboard" 
-                    element={
-                        <ProtectedRoute>
-                            <DashboardPage />
-                        </ProtectedRoute>
-                    } 
-                />
-                <Route 
-                    path="/admin" 
-                    element={
-                        <AdminRoute>
-                            <AdminPage />
-                        </AdminRoute>
-                    } 
-                />
-                <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-        </HashRouter>
-    );
-}
-
-export default App;
+export default AuthProvider;
